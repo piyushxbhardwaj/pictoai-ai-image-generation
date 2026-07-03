@@ -10,6 +10,12 @@
 
 **PictoAI** is an AI-powered art generation platform built with React, Flask, and Stable Diffusion, featuring automatic failover routing, prompt caching, and Razorpay subscription checkouts.
 
+[![PictoAI Hero Banner](screenshots/homepage.png)](screenshots/homepage.png)
+*Click to expand application landing view*
+
+### 💡 Why I Built This
+I built PictoAI to explore production-grade AI application development beyond simple model inference by combining authentication, payments, caching, failover routing, and a complete frontend experience.
+
 ---
 
 ### 📊 Project Statistics
@@ -26,7 +32,7 @@
 
 ## 📸 Screenshots
 
-| 🌟 Workspace (Generated) | ⚙️ Workbench (Empty) |
+| 🌟 Workspace (Generated State) | ⚙️ Workbench (Empty State) |
 |:---:|:---:|
 | [![Workspace Generated](screenshots/workspace_generated.png)](screenshots/workspace_generated.png) | [![Workspace Empty](screenshots/workspace_empty.png)](screenshots/workspace_empty.png) |
 | *Click to enlarge* | *Click to enlarge* |
@@ -35,20 +41,20 @@
 
 ## 🚀 Live Demo & Links
 
-* **Live Frontend Demo**: *Coming Soon*
-* **Walkthrough Video**: *Coming Soon*
-* **Local Sandbox Mode**: Instantly bootable locally without active MongoDB databases or external AI API keys.
+* **Live Demo**: Local sandbox supported.
+* **Demo Video**: Walkthrough video available upon request.
+* **Sandbox Mode**: Automatically boots into offline sandbox simulator if local databases or API keys are missing.
 
 ---
 
 ## ⚡ Key Engineering Highlights
 
-* **✅ Multi-Provider AI Inference**: Failover AI router that sequentially executes local CUDA GPU models, Hugging Face Serverless APIs, and Clipdrop before returning fallback canvas graphics.
-* **✅ MD5 Prompt Caching**: Eliminates redundant GPU compute and third-party API costs by hashing prompts and checking database caches first.
-* **✅ JWT Session Authorization**: Protects user credit transactions with bcrypt password hashing and Flask-JWT bearer tokens.
-* **✅ Razorpay Webhook Receivers**: Fully integrated checkout workflows driven by signature-verified transaction event listeners.
-* **✅ Integration Regression Tests**: End-to-end endpoint validations covering sessions, images, and payments.
-* **✅ DB-Offline Fail-Safe**: Detects local DB statuses to run fully in offline sandbox simulator mode.
+* **✅ Multi-provider AI inference**: Automatic failover routing that sequentially tries local GPU pipelines, Hugging Face cloud APIs, and Clipdrop before returning styled canvas fallbacks.
+* **✅ MD5 prompt hashing**: Eliminates redundant GPU compute and API limits by hashing prompts and checking database caches first.
+* **✅ JWT authentication**: Secure access tokens with bcrypt password hashing.
+* **✅ Razorpay subscription workflow**: Fully integrated checkout workflows driven by signature-verified transaction event webhooks.
+* **✅ Integration testing**: End-to-end regression validation suites (`test_endpoints.py`) to verify critical API paths.
+* **✅ Offline sandbox mode**: Automated database-connectivity checkers enabling recruiter testing without active Mongo clusters.
 
 ---
 
@@ -62,7 +68,7 @@
 * **Payments**: Razorpay Gateway
 
 ### 👨‍💻 Role
-**Sole Developer** responsible for system architecture, endpoint designs, frontend context models, failover logic, payment capture webhooks, testing suites, and local mock sandbox modes.
+**Sole Developer** responsible for complete software architecture, API design, database schemas, frontend state contexts, failover routing logic, webhook receivers, testing, and sandbox configurations.
 
 ---
 
@@ -120,12 +126,14 @@ graph TD
 ## 📁 Folder Structure
 
 ```text
-client/         # React Frontend (Vite, AppContext)
-server/         # Flask Backend (routes, controllers, models)
-screenshots/    # Clickable project preview screenshots
-.env.example    # Root setup variable template
-LICENSE         # MIT Open-source license file
-README.md       # Project developer guide
+pictoai-ai-image-generation/
+├── client/                 # React Frontend (Vite)
+├── server/                 # Flask Backend & AI routes
+├── docs/                   # Extended API documentation
+├── screenshots/            # Showcase interface images
+├── .env.example            # Root environment variables configuration template
+├── LICENSE                 # MIT License file
+└── README.md               # Main developer guide
 ```
 
 ---
@@ -133,12 +141,12 @@ README.md       # Project developer guide
 ## 🧠 Engineering Challenges & Core Solutions
 
 ### 1. Handling Long and Flaky AI Inference Times
-* **Challenge**: Local AI models require massive VRAM and take 30s+ on standard machines, while cloud APIs are prone to rate limits and downtime.
+* **Challenge**: Local diffusion inference is computationally expensive, while cloud APIs are prone to rate limits, timeouts, and network failures.
 * **Solution**: Developed a sequential failover pipeline in the AI router. When local GPUs are unavailable or cloud APIs fail, the backend catches the error and executes alternative endpoints, significantly improving reliability during provider failures.
 
-### 2. Eliminating Duplicate GPU Computes
-* **Challenge**: Users entering the exact same prompts with matching aspect ratios repeatedly drain developer credits and load servers.
-* **Solution**: Generated MD5 hashes of prompt, style, model, and aspect parameters. Duplicate hashes serve the pre-rendered image path directly from MongoDB in milliseconds.
+### 2. Eliminating Redundant GPU Inference
+* **Challenge**: Users entering the exact same prompts with matching aspect ratios repeatedly drain API limits and overload servers.
+* **Solution**: Generated MD5 hashes of prompt, style, model, and aspect parameters. Duplicate hashes serve the pre-rendered image path directly from MongoDB, returning results almost instantly.
 
 ### 3. Verification of Multi-Provider Binary Payloads
 * **Challenge**: Failover APIs can succeed but return truncated or corrupted binary packages.
@@ -148,7 +156,7 @@ README.md       # Project developer guide
 
 ## 💡 Lessons Learned
 
-* **Fault-Tolerant Architectures**: Designing robust sequential failovers ensuring high service availability.
+* **Fault-Tolerant Architectures**: Designing robust sequential failovers ensuring high reliability.
 * **Authentication Security**: Protecting billing features using cryptographically signed JWT tokens and salted bcrypt hashes.
 * **Latency Management**: Implementing metadata caching algorithms to bypass heavy inference pipelines.
 * **Signature Verification**: Developing secure backend listeners to process financial status updates from third-party payment gateways.
@@ -159,16 +167,16 @@ README.md       # Project developer guide
 
 Detailed request/response JSON schemas can be found in [docs/API.md](file:///d:/Project/PICTOAI-main/docs/API.md).
 
-| Verb | Endpoint | Authentication | Description |
+| Method | Endpoint | Auth | Description |
 |:---|:---|:---:|:---|
-| `POST` | `/api/auth/register` | Public | Register new user account |
-| `POST` | `/api/auth/login` | Public | Authenticate user and issue JWT |
-| `GET` | `/api/auth/credits` | Required | Retrieve session balance & plans |
-| `POST` | `/api/image/generate-image` | Required | Run failover AI image generator |
-| `POST` | `/api/image/upscale` | Required | Request upscale simulation |
-| `POST` | `/api/payment/create-order` | Required | Generate Razorpay order details |
-| `POST` | `/api/payment/verify` | Required | Validate payment and activate plan |
-| `POST` | `/api/payment/webhook` | Public | Capture Razorpay transaction events |
+| POST | `/api/auth/register` | No | Register new user account |
+| POST | `/api/auth/login` | No | Authenticate user and issue JWT |
+| GET | `/api/auth/credits` | Yes | Retrieve session balance & plans |
+| POST | `/api/image/generate-image` | Yes | Run failover AI image generator |
+| POST | `/api/image/upscale` | Yes | Request upscale simulation |
+| POST | `/api/payment/create-order` | Yes | Generate Razorpay order details |
+| POST | `/api/payment/verify` | Yes | Validate payment and activate plan |
+| POST | `/api/payment/webhook` | No | Capture Razorpay transaction events |
 
 ---
 
@@ -190,11 +198,13 @@ python server/test_endpoints.py
 
 ## 🚀 Deployment Ready Configuration
 
-* **Frontend**: Host-ready Vite build assets designed for static hosting platforms (Vercel, Netlify).
-* **Backend**: WSGI compliant script ready to run via Gunicorn on Render, AWS ECS, or Heroku.
-* **Database**: MongoDB Atlas cloud cluster connections.
-* **Payments**: Razorpay test/production environment variables.
-* **Environment Variables**: Configure values securely using host provider environment panels.
+Designed with modular controllers, provider abstraction, and stateless REST APIs to support future horizontal scaling.
+
+* **Frontend**: Vercel (static production build)
+* **Backend**: Render (Gunicorn production WSGI server)
+* **Database**: MongoDB Atlas cloud cluster
+* **Payments**: Razorpay Gateway environment keys
+* **Environment Variables**: Managed securely via GitHub Secrets and provider environment configuration panels
 
 ---
 
