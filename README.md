@@ -9,15 +9,42 @@
 </p>
 
 ### 📝 Repository Description
-**PictoAI** is an AI-powered image generation platform built with React, Flask, Stable Diffusion, JWT authentication, MongoDB, and multi-provider inference pipelines. It features a futuristic neon UI workbench, prompt-matching md5 response caching, and a robust failover routing system designed for 100% service availability.
+**PictoAI** is an AI-powered image generation platform built with React, Flask, Stable Diffusion, JWT authentication, MongoDB, and multi-provider inference pipelines. It features a futuristic neon UI workbench, prompt-matching md5 response caching, and a robust failover routing system designed for high availability through multi-provider failover.
+
+---
+
+## 🔗 Project Demo & Links
+
+* **Live Frontend Demo**: *(Insert your live URL here if deployed, or launch local sandbox mode)*
+* **Video Demonstration**: [Watch the walkthrough on YouTube](https://youtube.com) *(Insert your screen-recording URL)*
+* **API Reference**: Read the [REST API Documentation](#-rest-api-documentation) section.
+
+---
+
+## ⚖️ Feature Summary & Comparison
+
+| Feature | Supported | Description |
+| :--- | :---: | :--- |
+| **Stable Diffusion Generation** | ✅ | Native text-to-image synthesis using diffusion pipelines. |
+| **Multi-Provider Fallback** | ✅ | Automated failovers across local CUDA and cloud serverless providers. |
+| **JWT Authorization** | ✅ | Secure user sessions, password salting (bcrypt), and credit limits. |
+| **Prompt Metadata Caching** | ✅ | MD5 checking to serve duplicate prompt designs almost instantly. |
+| **Razorpay Checkout Integration** | ✅ | Secure web store integration for purchasing subscription credit top-ups. |
+| **Backend Integration Tests** | ✅ | Full end-to-end endpoint regression suite validation. |
+| **Local Sandbox Fail-Safe** | ✅ | Auto-detects DB presence to run without MongoDB setups. |
 
 ---
 
 ## 📸 Application Interface Showcase
 
-| 🌟 Workspace (Generated State) | ⚙️ Workspace (Empty State) |
-| :---: | :---: |
-| ![Workspace Generated](screenshots/workspace_generated.png) | ![Workspace Empty](screenshots/workspace_empty.png) |
+### 🌟 Workspace Page (Generated State)
+![Workspace Generated](screenshots/workspace_generated.png)
+
+### ⚙️ Workbench Page (Empty State)
+![Workspace Empty](screenshots/workspace_empty.png)
+
+### 🏠 Landing Page
+![Landing Page](screenshots/homepage.png)
 
 ---
 
@@ -25,26 +52,26 @@
 
 ```mermaid
 graph TD
-    subgraph Client [React Frontend (Vite)]
+    subgraph Client
         UI[Futuristic Neon UI Workbench]
         Context[React Context / AppState]
         AxiosClient[Axios REST Client]
     end
 
-    subgraph Server [Flask Backend]
+    subgraph Server
         API[REST Controller Endpoints]
         Auth[Flask-JWT-Extended Auth]
         Router[AI Provider Failover Router]
     end
 
-    subgraph Inference [Multi-Provider AI Inference Pipelines]
-        LocalSD[1. Local CUDA Stable Diffusion]
-        HF_API[2. Hugging Face Inference API]
-        Clipdrop[3. Clipdrop text-to-image API]
-        Offline[4. Canvas Offline Placeholder Generator]
+    subgraph Inference
+        LocalSD[1. Try Local CUDA GPU]
+        HF_API[2. Try Hugging Face Cloud]
+        Clipdrop[3. Try Clipdrop API]
+        Offline[4. Offline Canvas Fallback]
     end
 
-    subgraph Storage [Database Layer]
+    subgraph Storage
         DB[(MongoDB)]
     end
 
@@ -53,11 +80,11 @@ graph TD
     AxiosClient -->|Axios REST Requests| API
     API --> Auth
     Auth -->|Authorized Request| Router
-    Router -->|1. Try Local GPU| LocalSD
-    Router -->|2. Try Cloud HF| HF_API
-    Router -->|3. Try Clipdrop API| Clipdrop
-    Router -->|4. Offline Fallback| Offline
-    Router -->|Read / Write Caches| DB
+    Router --> LocalSD
+    Router --> HF_API
+    Router --> Clipdrop
+    Router --> Offline
+    Router --> DB
 ```
 
 ---
@@ -65,9 +92,30 @@ graph TD
 ## 📊 Core Performance Metrics & Highlights
 
 * **4 Fallback Tiers**: AI router provides uninterrupted generation using Local CUDA ➔ Hugging Face API ➔ Clipdrop API ➔ Offline Canvas drawer.
-* **Metadata Prompt Caching**: Checks MD5 query parameter hashes to serve cached images instantly in **< 50ms**, skipping redundant GPU compute.
+* **Metadata Prompt Caching**: Checks MD5 query parameter hashes to serve cached images almost instantly, skipping redundant GPU compute.
 * **JWT-Based Session Security**: Standard bcrypt salt-hashing with secure bearer access tokens for credit protection.
 * **Instant Sandbox Mode**: Detects database availability and automatically boots into offline Demo Mode if MongoDB is offline.
+
+---
+
+## 📂 Backend Architecture & File System
+
+The backend is structured into modular layers adhering to standard MVC design principles:
+
+* **[app.py](file:///d:/Project/PICTOAI-main/server/app.py)**: Central entrypoint initializing Flask, Flask-JWT-Extended, CORS, configurations, and Blueprints.
+* **[routes/](file:///d:/Project/PICTOAI-main/server/routes/)**: Declares HTTP paths and maps endpoints to controllers:
+  * [auth_routes.py](file:///d:/Project/PICTOAI-main/server/routes/auth_routes.py): Paths for `/register`, `/login`, `/credits`, and `/payment-success`.
+  * [image_routes.py](file:///d:/Project/PICTOAI-main/server/routes/image_routes.py): Paths for `/generate-image`, `/upscale`, and `/variation`.
+  * [payment_routes.py](file:///d:/Project/PICTOAI-main/server/routes/payment_routes.py): Razorpay order generation, signature verification, and webhook receivers.
+  * [health_routes.py](file:///d:/Project/PICTOAI-main/server/routes/health_routes.py): Endpoint checking system status.
+* **[controllers/](file:///d:/Project/PICTOAI-main/server/controllers/)**: Orchestrates business logic and interact with DB models:
+  * [auth_controller.py](file:///d:/Project/PICTOAI-main/server/controllers/auth_controller.py): Manages session tokens, passwords, and database queries.
+  * [image_controller.py](file:///d:/Project/PICTOAI-main/server/controllers/image_controller.py): Computes hashes, verifies image buffers, and runs failover pipelines.
+  * [payment_controller.py](file:///d:/Project/PICTOAI-main/server/controllers/payment_controller.py): Handles transaction states, signatures, and subscriptions.
+* **[config/](file:///d:/Project/PICTOAI-main/server/config/)**: Declares environment loaders:
+  * [db.py](file:///d:/Project/PICTOAI-main/server/config/db.py): Initializes PyMongo database connections.
+  * [model.py](file:///d:/Project/PICTOAI-main/server/config/model.py): Boots local Stable Diffusion pipelines (Diffusers) or fallbacks.
+* **[static/generated/](file:///d:/Project/PICTOAI-main/server/static/generated/)**: Assets folder storing generated PNG images.
 
 ---
 
@@ -219,6 +267,35 @@ All endpoints (except Authentication and Webhooks) require the `Authorization` h
 
 ---
 
+## 🧪 Testing Coverage & Verification
+
+To maintain code reliability, the repository includes integration tests validating the core application layers (can be checked in [test_endpoints.py](file:///d:/Project/PICTOAI-main/server/test_endpoints.py)):
+
+* **API Endpoints**: Auto-checks status codes and response headers across Flask routes.
+* **Authentication**: Verifies password hashing strength (bcrypt), JWT bearer verification, and token access policies.
+* **Payment Verification**: Simulates Razorpay transaction signatures to ensure correct invoice recording.
+* **Image Generation**: Validates multi-provider failover routing logic and image format verification.
+* **Response Caching**: Tests MD5 prompt hash detection to ensure duplicate requests serve from cache rather than re-running models.
+
+To run the automated integration suite:
+```bash
+python server/test_endpoints.py
+```
+
+---
+
+## 🚀 Deployment Ready Architecture
+
+PictoAI is designed to be deployed across scalable production environments:
+
+* **React Frontend**: Optimized Vite production builds ready to host on static hosts like Vercel, Netlify, or AWS S3/CloudFront.
+* **Flask Backend**: Production-ready WSGI compatibility (runs via Gunicorn/uWSGI) deployable to Heroku, Render, AWS ECS, or DigitalOcean.
+* **MongoDB**: Integrates with MongoDB Atlas cloud databases or locally hosted replica sets.
+* **Environment variables**: Decouples sensitive production parameters (API credentials, secret keys) securely.
+* **Docker Compose (Planned)**: Multi-service container definitions for single-command local/cloud boots.
+
+---
+
 ## 🚀 Future Roadmap
 
 - [ ] **Docker Deployment**: Introduce `docker-compose` to start Flask, React, and MongoDB in simple isolated containers.
@@ -270,15 +347,6 @@ All endpoints (except Authentication and Webhooks) require the `Authorization` h
    ```bash
    npm run dev
    ```
-
----
-
-## 🧪 Running Integration Tests
-
-To run the automated endpoint validation suite, launch the server, then execute:
-```bash
-python server/test_endpoints.py
-```
 
 ---
 
