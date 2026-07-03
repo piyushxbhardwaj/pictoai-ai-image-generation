@@ -4,6 +4,7 @@ import { useApp } from './context/useApp.jsx';
 import Navbar from './components/Navbar';
 import LandingPage from './components/LandingPage';
 import Workspace from './components/Workspace';
+import Dashboard from './components/Dashboard';
 import AuthModal from './components/AuthModal';
 
 function AppContent() {
@@ -24,6 +25,8 @@ function AppContent() {
       {/* Tab routing switcher */}
       {activeTab === 'home' ? (
         <LandingPage onOpenAuth={openAuth} />
+      ) : activeTab === 'dashboard' ? (
+        <Dashboard />
       ) : (
         <Workspace />
       )}

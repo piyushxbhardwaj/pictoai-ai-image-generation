@@ -38,7 +38,11 @@ def register_user():
             "name": name,
             "email": email,
             "password": hashed_password,
-            "creditBalance": 50 # Default 50 credits on signup
+            "creditBalance": 50, # Default 50 credits on signup
+            "monthlyCreditLimit": 50,
+            "plan": "starter",
+            "subscriptionStatus": "inactive",
+            "subscription": None
         }
 
         result = db.users.insert_one(user_data)
@@ -50,7 +54,13 @@ def register_user():
         return jsonify({
             "success": True,
             "token": token,
-            "user": {"name": name}
+            "user": {
+                "name": name,
+                "email": email,
+                "plan": "starter",
+                "subscriptionStatus": "inactive",
+                "monthlyCreditLimit": 50
+            }
         }), 201
     except Exception as e:
         print(f"Registration error: {e}")
@@ -82,7 +92,13 @@ def login_user():
             return jsonify({
                 "success": True,
                 "token": token,
-                "user": {"name": user["name"]}
+                "user": {
+                    "name": user.get("name"),
+                    "email": user.get("email"),
+                    "plan": user.get("plan", "starter"),
+                    "subscriptionStatus": user.get("subscriptionStatus", "inactive"),
+                    "monthlyCreditLimit": user.get("monthlyCreditLimit", 50)
+                }
             }), 200
         else:
             return jsonify({"success": False, "message": "Invalid credentials"}), 400
@@ -107,7 +123,14 @@ def get_user_credits():
         return jsonify({
             "success": True,
             "credits": user.get("creditBalance", 0),
-            "user": {"name": user.get("name")}
+            "user": {
+                "name": user.get("name"),
+                "email": user.get("email"),
+                "plan": user.get("plan", "starter"),
+                "subscriptionStatus": user.get("subscriptionStatus", "inactive"),
+                "monthlyCreditLimit": user.get("monthlyCreditLimit", 50),
+                "subscription": user.get("subscription", None)
+            }
         }), 200
     except Exception as e:
         print(f"Get credits error: {e}")

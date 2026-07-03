@@ -1,13 +1,20 @@
 import os
 import torch
 import requests
+import io
 from dotenv import load_dotenv
+from huggingface_hub import InferenceClient
+from huggingface_hub.utils import HfHubHTTPError
 
 # Load env variables
 load_dotenv()
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 CLIPDROP_API = os.getenv("CLIPDROP_API")
+
+print(f"[INFO] HF_TOKEN loaded: {bool(HF_TOKEN)}")
+print(f"[INFO] HF_TOKEN length: {len(HF_TOKEN) if HF_TOKEN else 0}")
+print(f"[INFO] CLIPDROP_API loaded: {bool(CLIPDROP_API)}")
 
 # Global pipeline cache
 _pipelines = {}
@@ -72,6 +79,41 @@ def load_local_pipeline(model_type):
         print(f"[WARNING] Failed to load local pipeline for {model_type}: {e}")
         return None
 
+def get_hf_api_model_id(model_type):
+    if model_type == 'Fast':
+        return "black-forest-labs/FLUX.1-schnell"
+    elif model_type == 'HD':
+        return "stabilityai/stable-diffusion-xl-base-1.0"
+    elif model_type == 'Creative':
+        return "stabilityai/stable-diffusion-3.5-medium"
+    return "black-forest-labs/FLUX.1-schnell"
+
+class HFRequestInterceptor:
+    """
+    Context manager to intercept and log the exact HTTP calls made by InferenceClient.
+    """
+    def __init__(self):
+        self.original_request = requests.Session.request
+
+    def __enter__(self):
+        def intercept(session_self, method, url, *args, **kwargs):
+            print(f"[INFO] Hugging Face API Request: {method} {url}")
+            try:
+                res = self.original_request(session_self, method, url, *args, **kwargs)
+                print(f"[INFO] Hugging Face API Response Status: {res.status_code}")
+                if res.status_code != 200:
+                    print(f"[WARNING] Hugging Face API Error Response: {res.text}")
+                return res
+            except Exception as e:
+                print(f"[WARNING] Hugging Face API Network Exception: {e}")
+                raise
+        
+        requests.Session.request = intercept
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        requests.Session.request = self.original_request
+
 def generate_via_hf_api(prompt, model_type, timeout=30):
     """
     Call Hugging Face Inference API as a fast, keyless/keyed GPU fallback.
@@ -80,31 +122,24 @@ def generate_via_hf_api(prompt, model_type, timeout=30):
         print("[WARNING] HF_TOKEN is missing. Skipping Hugging Face Inference API call.")
         return None
         
-    model_id = get_huggingface_model_id(model_type)
-    api_url = f"https://api-inference.huggingface.co/models/{model_id}"
+    model_id = get_hf_api_model_id(model_type)
+    print(f"[INFO] Initializing Hugging Face InferenceClient for model: {model_id}...")
     
-    headers = {}
-    if HF_TOKEN:
-        headers["Authorization"] = f"Bearer {HF_TOKEN}"
-        
-    print(f"[INFO] Routing to Hugging Face Inference API: {api_url}...")
     try:
-        response = requests.post(
-            api_url,
-            headers=headers,
-            json={"inputs": prompt},
-            timeout=timeout
-        )
-        if response.status_code == 200:
-            return response.content
-        else:
-            print(
-                f"[WARNING] Hugging Face API returned status {response.status_code} "
-                f"with content-type {response.headers.get('content-type')}: {response.text[:500]}"
-            )
-            return None
+        # Use token parameter matching huggingface_hub client signature
+        client = InferenceClient(token=HF_TOKEN, timeout=timeout)
+        
+        with HFRequestInterceptor():
+            image = client.text_to_image(prompt, model=model_id)
+            
+        # Convert PIL.Image back to bytes
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG")
+        return buffer.getvalue()
     except Exception as e:
         print(f"[WARNING] Hugging Face API request failed: {type(e).__name__}: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"[ERROR] Hugging Face API Full Error Response: {e.response.text}")
         return None
 
 def generate_via_clipdrop_api(prompt, timeout=60):

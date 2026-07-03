@@ -9,6 +9,7 @@ server/venv/
 *.pyc
 
 # Local environment variables and logs
+.env
 server/.env
 *.log
 

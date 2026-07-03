@@ -128,7 +128,11 @@ const Navbar = ({ onOpenAuth }) => {
                   className="flex items-center space-x-2 rounded-full bg-primary/10 border border-primary/20 px-4 py-1.5 text-sm font-semibold text-primary hover:bg-primary/20 transition-all duration-300 shadow-glow-yellow"
                 >
                   <Database className="h-4 w-4" />
-                  <span>{credits} Credits</span>
+                  <span>
+                    {user?.plan === 'pro' && '⭐ Pro Plan | '}
+                    {user?.plan === 'premium' && '⭐ Premium Plan | '}
+                    {credits} Credits
+                  </span>
                 </button>
 
                 {/* Workspace CTA Button */}
@@ -166,6 +170,13 @@ const Navbar = ({ onOpenAuth }) => {
                       >
                         <Sparkles className="h-4 w-4 text-primary" />
                         <span>AI Workbench</span>
+                      </button>
+                      <button
+                        onClick={() => { playSfx('click'); setActiveTab('dashboard'); setUserDropdownOpen(false); }}
+                        className="flex w-full items-center space-x-2 rounded-lg px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                      >
+                        <User className="h-4 w-4 text-primary" />
+                        <span>User Dashboard</span>
                       </button>
                       <button
                         onClick={() => { playSfx('click'); logout(); setUserDropdownOpen(false); }}
@@ -238,7 +249,11 @@ const Navbar = ({ onOpenAuth }) => {
               {user ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between rounded-lg bg-zinc-900 p-3">
-                    <span className="text-sm text-zinc-400">Balance</span>
+                    <span className="text-sm text-zinc-400">
+                      {user?.plan === 'pro' && '⭐ Pro Plan'}
+                      {user?.plan === 'premium' && '⭐ Premium Plan'}
+                      {(!user?.plan || user?.plan === 'starter') && 'Starter Plan'}
+                    </span>
                     <span className="text-sm font-bold text-primary">✨ {credits} Credits</span>
                   </div>
                   <button

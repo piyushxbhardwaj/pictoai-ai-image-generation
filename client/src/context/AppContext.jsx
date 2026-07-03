@@ -6,6 +6,22 @@ import AppContext from './appContext';
 // Base backend URL
 const BACKEND_URL = 'http://localhost:3000';
 
+// Helper to dynamically load Razorpay Checkout script
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
+
 function loadStoredJSON(key, fallback) {
   try {
     const saved = localStorage.getItem(key);
@@ -115,8 +131,16 @@ export const AppProvider = ({ children }) => {
         });
         if (res.data.success) {
           setCredits(res.data.credits);
-          if (res.data.user && res.data.user.name) {
-            setUser(prev => ({ ...prev, name: res.data.user.name }));
+          if (res.data.user) {
+            setUser(prev => ({ 
+              ...prev, 
+              name: res.data.user.name,
+              email: res.data.user.email,
+              plan: res.data.user.plan || 'starter',
+              subscriptionStatus: res.data.user.subscriptionStatus || 'inactive',
+              monthlyCreditLimit: res.data.user.monthlyCreditLimit || 50,
+              subscription: res.data.user.subscription || null
+            }));
           }
         }
       } catch (error) {
@@ -245,7 +269,7 @@ export const AppProvider = ({ children }) => {
         const res = await axios.post(`${BACKEND_URL}/api/user/register`, { name, email, password });
         if (res.data.success) {
           setToken(res.data.token);
-          setUser({ name });
+          setUser(res.data.user);
           playSfx('success');
           // Fetch backend initial credits
           await syncCredits(res.data.token);
@@ -260,7 +284,7 @@ export const AppProvider = ({ children }) => {
       }
     } else {
       // Sandbox Mode registration
-      setUser({ name, email });
+      setUser({ name, email, plan: 'starter', subscriptionStatus: 'inactive', monthlyCreditLimit: 50 });
       setToken('sandbox_token_jwt_123');
       setCredits(50); // Give 50 starting credits
       playSfx('success');
@@ -275,7 +299,7 @@ export const AppProvider = ({ children }) => {
         const res = await axios.post(`${BACKEND_URL}/api/user/login`, { email, password });
         if (res.data.success) {
           setToken(res.data.token);
-          setUser({ name: res.data.user.name });
+          setUser(res.data.user);
           playSfx('success');
           await syncCredits(res.data.token);
           return { success: true };
@@ -291,7 +315,13 @@ export const AppProvider = ({ children }) => {
       // Sandbox Mode login
       if (email && password.length >= 4) {
         const name = email.split('@')[0];
-        setUser({ name: name.charAt(0).toUpperCase() + name.slice(1), email });
+        setUser({ 
+          name: name.charAt(0).toUpperCase() + name.slice(1), 
+          email, 
+          plan: 'starter', 
+          subscriptionStatus: 'inactive', 
+          monthlyCreditLimit: 50 
+        });
         setToken('sandbox_token_jwt_123');
         playSfx('success');
         return { success: true };
@@ -447,6 +477,180 @@ export const AppProvider = ({ children }) => {
     return true;
   };
 
+  // --- RAZORPAY SUBSCRIPTION CHECKOUT & STATE SYNCHRONISATION ---
+  const getSubscriptionStatus = useCallback(async () => {
+    if (isBackendOnline && token && token !== 'sandbox_token_jwt_123') {
+      try {
+        const res = await axios.get(`${BACKEND_URL}/api/payment/subscription-status`, {
+          headers: { token }
+        });
+        if (res.data.success) {
+          setCredits(res.data.credits);
+          setUser(prev => ({
+            ...prev,
+            plan: res.data.plan,
+            subscriptionStatus: res.data.subscriptionStatus,
+            monthlyCreditLimit: res.data.monthlyCreditLimit,
+            subscription: res.data.subscription
+          }));
+          return res.data;
+        }
+      } catch (error) {
+        console.error('Failed to fetch subscription status:', error);
+      }
+    }
+    // Sandbox fallback
+    const mockHist = loadStoredJSON('pictoai_payment_history', []);
+    return {
+      success: true,
+      plan: user?.plan || 'starter',
+      subscriptionStatus: user?.subscriptionStatus || 'inactive',
+      credits: credits,
+      monthlyCreditLimit: user?.monthlyCreditLimit || 50,
+      renewalDate: user?.subscription?.endDate ? new Date(user.subscription.endDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A',
+      subscription: user?.subscription || null,
+      paymentHistory: mockHist
+    };
+  }, [isBackendOnline, token, user, credits]);
+
+  const purchaseSubscription = async (planName, amountINR) => {
+    playSfx('click');
+    if (isBackendOnline && token && token !== 'sandbox_token_jwt_123') {
+      try {
+        // Load Razorpay checkout script first
+        const isLoaded = await loadRazorpayScript();
+        if (!isLoaded) {
+          playSfx('error');
+          return { success: false, message: 'Failed to load Razorpay Payment Gateway. Check your network.' };
+        }
+
+        // 1. Create payment order on backend
+        const res = await axios.post(`${BACKEND_URL}/api/payment/create-order`, {
+          plan: planName,
+          amount: amountINR * 100, // in paise
+          currency: 'INR'
+        }, {
+          headers: { token }
+        });
+
+        if (!res.data.success) {
+          playSfx('error');
+          return { success: false, message: res.data.message || 'Failed to create payment order.' };
+        }
+
+        const orderData = res.data; // orderId, amount, currency, plan, keyId
+
+        // 2. Launch Razorpay interface
+        return new Promise((resolve) => {
+          const options = {
+            key: orderData.keyId,
+            amount: orderData.amount,
+            currency: orderData.currency,
+            name: 'PictoAI',
+            description: `${planName.toUpperCase()} Plan Subscription`,
+            image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200&auto=format&fit=crop',
+            order_id: orderData.orderId,
+            handler: async function (response) {
+              try {
+                // 3. Verify signature on backend
+                const verifyRes = await axios.post(`${BACKEND_URL}/api/payment/verify`, {
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature
+                }, {
+                  headers: { token }
+                });
+
+                if (verifyRes.data.success) {
+                  playSfx('success');
+                  // 4. Update local state
+                  setCredits(verifyRes.data.credits || 150);
+                  setUser(prev => ({
+                    ...prev,
+                    plan: verifyRes.data.plan,
+                    subscriptionStatus: 'active',
+                    subscription: verifyRes.data.subscription
+                  }));
+                  resolve({ success: true, message: 'Subscription successfully activated!' });
+                } else {
+                  playSfx('error');
+                  resolve({ success: false, message: verifyRes.data.message || 'Signature verification failed.' });
+                }
+              } catch (err) {
+                playSfx('error');
+                resolve({ success: false, message: err.response?.data?.message || 'Verification request failed.' });
+              }
+            },
+            prefill: {
+              name: user?.name || '',
+              email: user?.email || '',
+            },
+            theme: {
+              color: '#facc15'
+            },
+            modal: {
+              ondismiss: function () {
+                resolve({ success: false, message: 'Razorpay Checkout cancelled.' });
+              }
+            }
+          };
+
+          const rzp = new window.Razorpay(options);
+          rzp.open();
+        });
+
+      } catch (error) {
+        playSfx('error');
+        console.error('Subscription purchase error:', error);
+        return { success: false, message: error.response?.data?.message || 'Transaction initiation failed.' };
+      }
+    } else {
+      // Offline Sandbox Mode: simulate payment delay and activate mock plan
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      
+      const newCredits = planName === 'pro' ? 150 : 500;
+      const start = new Date();
+      const end = new Date();
+      end.setDate(end.getDate() + 30);
+      
+      const mockSub = {
+        plan: planName,
+        paymentId: `pay_mock_${Math.random().toString(36).substring(2, 9)}`,
+        orderId: `order_mock_${Math.random().toString(36).substring(2, 9)}`,
+        status: 'active',
+        startDate: start.toISOString(),
+        endDate: end.toISOString()
+      };
+
+      setCredits(newCredits);
+      setUser(prev => ({
+        ...prev,
+        plan: planName,
+        subscriptionStatus: 'active',
+        monthlyCreditLimit: newCredits,
+        subscription: mockSub
+      }));
+
+      // Store in Sandbox Payment History list in localStorage
+      const mockHistoryItem = {
+        id: `mock_tx_${Date.now()}`,
+        plan: planName,
+        amount: amountINR,
+        currency: 'INR',
+        orderId: mockSub.orderId,
+        paymentId: mockSub.paymentId,
+        status: 'success',
+        createdAt: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      };
+      
+      const storedHistory = loadStoredJSON('pictoai_payment_history', []);
+      localStorage.setItem('pictoai_payment_history', JSON.stringify([mockHistoryItem, ...storedHistory]));
+
+      playSfx('success');
+      return { success: true, message: 'Sandbox Subscription Activated!' };
+    }
+  };
+
   // --- HISTORY CONTROLS ---
   const clearHistory = () => {
     playSfx('click');
@@ -482,7 +686,9 @@ export const AppProvider = ({ children }) => {
         clearHistory,
         deleteHistoryItem,
         syncCredits,
-        toggleLiveMode
+        toggleLiveMode,
+        purchaseSubscription,
+        getSubscriptionStatus
       }}
     >
       {children}

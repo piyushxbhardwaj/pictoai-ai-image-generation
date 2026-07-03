@@ -7,6 +7,9 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv(override=True)
 
+print("RAZORPAY_KEY_ID loaded:", bool(os.getenv("RAZORPAY_KEY_ID")))
+print("RAZORPAY_KEY_SECRET loaded:", bool(os.getenv("RAZORPAY_KEY_SECRET")))
+
 app = Flask(__name__)
 
 # Configure CORS - allow frontend to connect
@@ -44,10 +47,12 @@ jwt = JWTManager(app)
 from routes.auth_routes import auth_bp
 from routes.image_routes import image_bp
 from routes.health_routes import health_bp
+from routes.payment_routes import payment_bp
 
 # Register blueprints
 app.register_blueprint(auth_bp, url_prefix="/api/user")
 app.register_blueprint(image_bp, url_prefix="/api/image")
+app.register_blueprint(payment_bp, url_prefix="/api/payment")
 app.register_blueprint(health_bp)
 
 # Root route for frontend health check compatibility
